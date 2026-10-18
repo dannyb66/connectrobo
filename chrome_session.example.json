@@ -1,0 +1,14 @@
+{
+  "mode": "read_only_no_send",
+  "browser": "chrome",
+  "user_data_dir": "~/Library/Application Support/JobRobo/ChromeProfile",
+  "profile_directory": null,
+  "profile_source": null,
+  "profile_source_key": "chrome_profile_path",
+  "session_strategy": "open_if_idle_else_handoff",
+  "chrome_binary": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "launch_second_instance": false,
+  "credentials": null,
+  "allowed_mutations": [],
+  "max_pages": 1
+}

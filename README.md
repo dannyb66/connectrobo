@@ -1,135 +1,66 @@
-<div style="text-align: center;">
-    <a href="https://www.youtube.com/channel/UCk2O3jSU3_B2MMGr8wLcAdw" target="_blank" title="CodeVoyage YouTube Channel">
-        <img src="banner.jpg" alt="Alt text">
-    </a>
-</div>
+# ConnectRobo
 
-# 🤖 LinkedIn Auto Connector Bot
+Open Chrome with an existing profile and inspect LinkedIn without sending outreach. The supported `connectrobo.py` command reuses the configured user-data directory and opens the LinkedIn feed. It does not log in, send invitations, follow people or send messages.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+## Run on macOS
 
-## 🌟 Overview
+Python 3.11+ and the official Google Chrome application are recommended. The safe startup and fixture commands use only Python's standard library; Selenium is not needed for them.
 
-The LinkedIn Auto Connector Bot is a powerful tool designed to automate connection requests on LinkedIn. This bot helps users expand their professional network by sending connection requests to a targeted audience based on specified search criteria. It can be customized to send personalized connection messages.
-
-:star::star::star::star::star: ---> Star the Repo!
-
-
-
-### ⚠️ Important Notes
-
-This script is a LinkedIn bot that automatically sends connection requests with a custom note to profiles on LinkedIn. It uses the Selenium WebDriver to navigate LinkedIn and interact with the UI elements.
-
-# 🚨🚨🚨 Please use it on your own risk! This is against LinkedIn policy. You may get banned if they catch you! 🚨🚨🚨
-
-## 🚨🚨🚨 **Do not exceed 80 requests per week!**  🚨🚨🚨
-
-### LinkedIn may block your account if you exceed this limit.
-
-P.S. For LinkedIn team - ooops, sorry! I was boring! 
-
-### 🚀 Quick Start Guide
-
-1. **💼 Add My LinkedIn:**  
-   You can connect with me on LinkedIn: [My LinkedIn Profile](https://www.linkedin.com/in/mrbondarenko/)
-
-2. **🔍 Set Up Your Search Link:**  
-   To set up your search link, follow these steps:
-   - Go to [LinkedIn's main page](https://www.linkedin.com/).
-   - In the search bar at the top, type in the keywords relevant to the people you want to connect with (e.g., "Tech Recruiter", "Cloud Engineer").
-   - Press Enter to see the search results.
-   - On the search results page, click on the "People" filter to narrow the results to LinkedIn profiles only.
-   - Copy the URL from your browser's address bar. This URL is your `SEARCH_LINK`.
-   - Open the bot script and find the `SEARCH_LINK` variable. Replace the existing link with the one you copied from LinkedIn.
-
-3. **🎉 Have Fun!**  
-   Start the bot and watch as it expands your network with targeted connection requests.
-
-## 🔧 Features
-
-- **🤖 Automated Connection Requests:** Send connection requests to targeted LinkedIn users.
-- **✉️ Personalized Messages:** Customize the connection request message for a more personalized outreach.
-- **🔎 Search Criteria:** Target connections based on industry, location, job title, and more.
-- **📊 Logging:** Keep track of connection requests and responses for analysis and optimization.
-
-## 🛠 Installation
-
-### 📋 Prerequisites
-
-- [Python 3.8+](https://www.python.org/downloads/)
-- [🌐 Mozilla Firefox](https://www.mozilla.org/en-US/firefox/new/) browser
-- [🦊 Geckodriver download page](https://github.com/mozilla/geckodriver/releases) (Ensure that the Geckodriver version matches your installed version of Firefox)
-
-### 📂 Clone the Repository
-
-```bash
-git clone https://github.com/OfficialCodeVoyage/LinkedIn_Auto_Connector_Bot.git
-cd LinkedIn_Auto_Connector_Bot
+```sh
+cd /path/to/connectrobo
+python3 -m venv .venv
+.venv/bin/python connectrobo.py --preflight
+.venv/bin/python connectrobo.py
 ```
 
-### 📦 Install Dependencies
-```bash
-pip install -r requirements.txt
+The normal command automatically starts visible Chrome if the configured profile is idle. A process-start result does not confirm LinkedIn login. If login is needed, sign in directly in Chrome and complete MFA yourself. Do not put credentials in configuration files or chat.
+
+If the profile is already running or has a lock marker, startup returns `PROFILE_BUSY`: use the existing window or close that profile normally before retrying. The launcher does not kill processes, delete locks or start another instance against a busy profile. It refuses to launch if process inspection fails. A local lease serializes starts from this checkout; Chrome's own singleton lock is the final guard against races with other applications. Do not launch JobRobo and ConnectRobo against the same profile simultaneously.
+
+## Saved profile configuration
+
+Without a local override, the committed `chrome_session.example.json` supplies the default existing profile `~/Library/Application Support/JobRobo/ChromeProfile`. The launcher refuses to create a replacement profile if that directory is missing.
+
+For machine-specific settings:
+
+```sh
+cp chrome_session.example.json chrome_session.json
 ```
 
-## 🛠️ Configuration
+Edit the ignored `chrome_session.json`; future runs automatically read it. Keep this file local. The example contains no credentials, and the program never reads or copies cookie/password databases.
 
-1. 🔐 Set up LinkedIn credentials:
-   Change the ```LINKEDIN_USERNAME``` and ```LINKEDIN_PASSWORD``` in the ```Linkedin_auto_connector_bot.py```.
+| Setting | Purpose |
+|---|---|
+| `user_data_dir` | Existing Chrome user-data root; `~` expands to your home folder. |
+| `profile_directory` | Optional existing subfolder such as `Default`; `null` lets Chrome select normally. |
+| `profile_source` | Optional path to JobRobo's `config/settings.py`; `null` requires no other checkout. If supplied, its literal profile setting must match. |
+| `profile_source_key` | JobRobo setting name, normally `chrome_profile_path`; parsed without executing the file. |
+| `chrome_binary` | Official installed Chrome executable: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`. |
+| `mode` | Must remain `read_only_no_send`. |
+| `session_strategy` | Must remain `open_if_idle_else_handoff`. |
+| `credentials`, `allowed_mutations`, `launch_second_instance` | Must remain `null`, `[]`, `false`. |
 
-2. 🔍 Customize Your Search Link:
-   Follow the instructions provided in the Quick Start Guide to generate your LinkedIn search link. Replace the SEARCH_LINK variable in the 
-   ```Linkedin_auto_connector_bot.py``` with your copied search link.
+Inspect `chrome://version` in the opened window to verify its Profile Path. The active subprofile should be under the configured user-data root. Selecting recipients or filters and granting permission for outreach are separate steps; this launcher includes no sending implementation.
 
-3. 📝 Configure Message Template:
-   Adjust the for ```BASE_CONNECTION_MESSAGE ``` your needs in the ```Linkedin_auto_connector_bot.py```.
+Advanced commands:
 
-   
-## 🚀 Usage
-### 🏃 Running the Bot
-
-```bash
-python linkedin_bot.py
+```sh
+.venv/bin/python connectrobo.py --config /path/to/local-config.json --preflight
+.venv/bin/python chrome_start.py --open
+.venv/bin/python safe_sample.py
+.venv/bin/python -m unittest discover -s . -v
 ```
-The bot will log into your LinkedIn account and begin sending connection requests based on the search criteria provided in your SEARCH_LINK.
 
-### 📜 Logging
-Logs of sent connection requests and responses are saved in the logs directory. You can review these logs to analyze the performance of your outreach strategy.
+`--preflight` does not open a browser. Exit 0 means the requested check/start step succeeded; exit 2 returns a blocked/error result. Tests mock browser creation and make no external requests. The synthetic fixture demonstrates control counting only; it does not validate today's authenticated LinkedIn selectors.
 
-### 🤝 Contributing
+## Legacy script and current limits
 
-Contributions are welcome! Please follow these steps to contribute:
+`Linkedin_auto_connector_bot.py` is the historical automatic outreach script. It contains embedded login configuration and sends connections/follows without a dry-run guard. **Do not run or import it for this workflow.** The supported startup is `connectrobo.py`. Embedded credentials and bundled drivers are never used by the supported launcher.
 
-🍴 Fork the repository.
+Live account identity, people-search filters, invitation success, personalized messages and automatic sending are not implemented or verified by these startup tests. The legacy template is unused, file logging claimed by its original documentation is absent, and its error/count handling is unreliable. No account-safety guarantee is implied by this project.
 
-🌿 Create a new branch (git checkout -b feature-branch).
+## Attribution and license
 
-💻 Make your changes.
+MIT License; original copyright (c) 2024 Pavlo Bondarenko. Retain [LICENSE](LICENSE). The original project README attributed [OfficialCodeVoyage/LinkedIn_Auto_Connector_Bot](https://github.com/OfficialCodeVoyage/LinkedIn_Auto_Connector_Bot). Repository: [dannyb66/connectrobo](https://github.com/dannyb66/connectrobo).
 
-📝 Commit your changes (git commit -am 'Add new feature').
-
-🚀 Push to the branch (git push origin feature-branch).
-
-📬 Open a pull request.
-
-
-### 📄 License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
-### ⚠️ Disclaimer
-This bot is intended for educational and research purposes only. The use of automated bots on LinkedIn may violate LinkedIn's terms of service. Use at your own risk.
-
-### 🛠️ Support
-For any questions or issues, please feel free to reach out via GitHub Issues or Discussions.
-
-### 🙌 Acknowledgements
-🤖 Selenium for web automation
-
-🐍 Python for providing the programming language
-
-🌍 The LinkedIn community for providing a platform to connect professionals worldwide
-
-
-Made with ❤️ by [Pavlo Bondarenko](https://www.linkedin.com/in/mrbondarenko/)
-https://github.com/OfficialCodeVoyage/LinkedIn_Auto_Connector_Bot?utm_source=chatgpt.com
-# connectrobo
+The safe launcher independently follows the existing JobRobo profile-setting convention (`chrome_profile_path` → `--user-data-dir`). It does not import or copy JobRobo's launcher, change its configuration, add stealth dependencies, create a debugging endpoint or extract authentication data.

@@ -1,0 +1,18 @@
+# Local configuration and browser/session data must never be committed.
+chrome_session.json
+.env
+.env.*
+!.env.example
+.venv/
+.venv*/
+venv/
+__pycache__/
+*.pyc
+.chrome-start.lock
+evidence/
+logs/
+ChromeProfile/
+chrome-profile/
+*Cookies*
+*Login Data*
+*.har
