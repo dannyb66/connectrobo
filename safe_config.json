@@ -1,0 +1,7 @@
+{
+  "mode": "offline_no_send",
+  "max_pages": 1,
+  "credentials": null,
+  "external_navigation": false,
+  "allowed_mutations": []
+}

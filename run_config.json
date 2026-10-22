@@ -1,0 +1,9 @@
+{
+  "keywords": "founder bay area",
+  "network": ["S"],
+  "max_attempts": 50,
+  "max_pages": 20,
+  "max_candidates": 200,
+  "login_timeout_seconds": 180,
+  "profile_timeout_seconds": 180
+}
