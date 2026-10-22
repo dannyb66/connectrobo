@@ -9,6 +9,7 @@ venv/
 __pycache__/
 *.pyc
 .chrome-start.lock
+.connectrobo-fallback.json
 evidence/
 logs/
 ChromeProfile/
@@ -16,3 +17,5 @@ chrome-profile/
 *Cookies*
 *Login Data*
 *.har
+
+.selenium-cache/

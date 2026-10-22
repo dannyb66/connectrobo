@@ -1,4 +1,4 @@
-"""Validate the shared JobRobo profile reference without launching a browser.
+"""Validate the configured Chrome profile without launching a browser.
 
 Never reads profile contents, cookies or credentials. Actual visible session
 selection and LinkedIn observations must use supported Computer Use controls.
@@ -23,8 +23,14 @@ def preflight(config_path=None):
     if (config["mode"] != "read_only_no_send" or config["allowed_mutations"] != []
             or config["credentials"] is not None or config["launch_second_instance"] is not False
             or config["browser"] != "chrome" or config["max_pages"] != 1):
-        raise ValueError("Only no-send shared-session mode is allowed")
+        raise ValueError("Only no-send session mode is allowed")
     profile = Path(config["user_data_dir"]).expanduser().resolve()
+    persistent = config.get("profile_kind") == "connectrobo_persistent"
+    create = config.get("create_profile_if_missing", False)
+    if not isinstance(create, bool):
+        raise ValueError("create_profile_if_missing must be a boolean")
+    if persistent and config.get("profile_source") is not None:
+        raise ValueError("A ConnectRobo profile must be independent of JobRobo")
     matches = None
     if config.get("profile_source") is not None:
         source = Path(config["profile_source"]).expanduser()
@@ -36,13 +42,15 @@ def preflight(config_path=None):
         matches = profile == Path(values[0]).expanduser().resolve()
         if not matches:
             raise ValueError("Configured profile differs from JobRobo")
-    if not profile.is_dir():
-        raise ValueError("Configured profile missing or different from JobRobo")
+    if not profile.is_dir() and not (persistent and create and not profile.exists()):
+        raise ValueError("Configured profile is missing or is not a directory")
     locks = [name for name in ("SingletonLock", "SingletonSocket", "SingletonCookie")
              if (profile / name).exists() or (profile / name).is_symlink()]
     return {"mode": config["mode"], "jobrobo_profile_matches": matches,
+            "profile_kind": "connectrobo_persistent" if persistent else "configured_shared",
+            "create_profile_if_missing": persistent and create,
             "user_data_dir": str(profile), "lock_markers": locks,
-            "configuration_ready": not locks, "browser_launched": False,
+            "configuration_ready": True, "browser_launched": False,
             "login_verified": False, "actions_executed": 0,
             "next": "Verify active processes and visible chrome://version profile before LinkedIn observation"}
 

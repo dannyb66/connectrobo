@@ -1,4 +1,6 @@
 import json
+import contextlib
+import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,6 +11,18 @@ import chrome_start as launcher
 
 
 class StartupTests(unittest.TestCase):
+    def test_already_open_profile_preflight_is_successful_observation(self):
+        busy = '123 chrome --user-data-dir=' + str(self.profile)
+        with patch.object(launcher, 'read_processes', return_value=busy), patch.object(launcher.subprocess, 'Popen') as spawn:
+            result = launcher.start(self.config)
+        self.assertEqual(result['result'], 'BROWSER_ALREADY_OPEN')
+        self.assertTrue(result['configuration_ready'])
+        self.assertTrue(result['browser_open'])
+        self.assertFalse(result['can_launch_new_instance'])
+        self.assertFalse(result['automation_ready'])
+        self.assertFalse(result['login_verified'])
+        spawn.assert_not_called()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -23,6 +37,7 @@ class StartupTests(unittest.TestCase):
         self.binary.chmod(0o700)
         self.config = self.root / 'chrome_session.json'
         self.data = {'mode': 'read_only_no_send', 'browser': 'chrome',
+                     'busy_profile_action': 'handoff',
                      'user_data_dir': str(self.profile), 'profile_directory': None,
                      'profile_source': str(source), 'profile_source_key': 'chrome_profile_path',
                      'session_strategy': 'open_if_idle_else_handoff',
@@ -53,7 +68,7 @@ class StartupTests(unittest.TestCase):
         alias.symlink_to(self.profile)
         self.assertEqual(launcher.active_profile_pids(self.profile, '88 chrome --user-data-dir=' + str(alias)), [88])
 
-    def test_lock_or_active_instance_refuses_without_launch(self):
+    def test_lock_or_active_instance_never_launches_and_has_distinct_status(self):
         for busy in ['lock', 'process']:
             with self.subTest(busy=busy):
                 lock = self.profile / 'SingletonLock'
@@ -62,17 +77,23 @@ class StartupTests(unittest.TestCase):
                 try:
                     text = '123 chrome --user-data-dir=' + str(self.profile) if busy == 'process' else ''
                     with patch.object(launcher, 'read_processes', return_value=text), patch.object(launcher.subprocess, 'Popen') as spawn:
-                        with self.assertRaisesRegex(launcher.StartupError, 'PROFILE_BUSY'):
-                            launcher.start(self.config, True)
+                        result = launcher.start(self.config, True)
+                        self.assertEqual(result['result'], 'PROFILE_LOCKED' if busy == 'lock' else 'BROWSER_ALREADY_OPEN')
+                        self.assertTrue(result['configuration_ready'])
+                        self.assertFalse(result['can_launch_new_instance'])
                         spawn.assert_not_called()
+                        if busy == 'lock':
+                            self.assertTrue(lock.is_symlink())
                 finally:
                     if lock.is_symlink():
                         lock.unlink()
 
     def test_process_inspection_denial_fails_closed(self):
         with patch.object(launcher.subprocess, 'run', side_effect=PermissionError), patch.object(launcher.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(launcher.StartupError, 'Cannot inspect'):
-                launcher.start(self.config, True)
+            result = launcher.start(self.config, True)
+            self.assertEqual(result['result'], 'PROFILE_STATE_UNKNOWN')
+            self.assertIsNone(result['browser_open'])
+            self.assertFalse(result['can_launch_new_instance'])
             spawn.assert_not_called()
 
     def test_config_mismatch_and_sending_are_rejected(self):
@@ -103,8 +124,8 @@ class StartupTests(unittest.TestCase):
     def test_profile_becomes_busy_between_checks(self):
         busy = '456 chrome --user-data-dir=' + str(self.profile)
         with patch.object(launcher.sys, 'platform', 'darwin'), patch.object(launcher, 'read_processes', side_effect=['', busy]), patch.object(launcher.subprocess, 'Popen') as spawn:
-            with self.assertRaisesRegex(launcher.StartupError, 'PROFILE_BUSY'):
-                launcher.start(self.config, True)
+            result = launcher.start(self.config, True)
+            self.assertEqual(result['result'], 'BROWSER_ALREADY_OPEN')
             spawn.assert_not_called()
 
     def test_immediate_exit_is_not_reported_success(self):
@@ -155,6 +176,38 @@ class StartupTests(unittest.TestCase):
                 with self.assertRaisesRegex(launcher.StartupError, 'Invalid configuration'):
                     launcher.start(self.config)
                 processes.assert_not_called()
+
+    def test_running_profile_with_locks_is_successful_preflight_and_start_handoff(self):
+        lock = self.profile / 'SingletonLock'
+        lock.symlink_to('/some-live-lock')
+        busy = '123 chrome --user-data-dir=' + str(self.profile)
+        for options in [[], ['--open']]:
+            output = io.StringIO()
+            with patch.object(launcher, 'read_processes', return_value=busy), patch.object(launcher.subprocess, 'Popen') as spawn, contextlib.redirect_stdout(output):
+                self.assertEqual(launcher.main(['--config', str(self.config)] + options), 0)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report['result'], 'BROWSER_ALREADY_OPEN')
+            self.assertTrue(report['browser_open'])
+            self.assertFalse(report['automation_ready'])
+            self.assertFalse(report['login_verified'])
+            spawn.assert_not_called()
+            self.assertTrue(lock.is_symlink())
+
+    def test_lock_only_and_unknown_preflight_keep_nonzero_exit_without_invalid_config_claim(self):
+        lock = self.profile / 'SingletonLock'
+        lock.symlink_to('/stale-or-unobservable-lock')
+        for state in ['locked', 'unknown']:
+            output = io.StringIO()
+            effect = launcher.StartupError('Cannot inspect') if state == 'unknown' else None
+            with patch.object(launcher, 'read_processes', return_value='', side_effect=effect), patch.object(launcher.subprocess, 'Popen') as spawn, contextlib.redirect_stdout(output):
+                self.assertEqual(launcher.main(['--config', str(self.config)]), 2)
+            report = json.loads(output.getvalue())
+            self.assertTrue(report['configuration_ready'])
+            self.assertEqual(report['result'], 'PROFILE_STATE_UNKNOWN' if state == 'unknown' else 'PROFILE_LOCKED')
+            self.assertFalse(report['can_launch_new_instance'])
+            self.assertFalse(report['login_verified'])
+            spawn.assert_not_called()
+            self.assertTrue(lock.is_symlink())
 
 
 if __name__ == '__main__':
